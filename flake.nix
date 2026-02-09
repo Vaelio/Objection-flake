@@ -2,7 +2,7 @@
   description = "Flake: Objection";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=25.05";
+    nixpkgs.url = "github:nixos/nixpkgs?ref=25.11";
   };
 
   outputs = { self, nixpkgs }: 
@@ -24,33 +24,40 @@
       build-system = [ python.pkgs.setuptools ];
       doCheck = false;
     };
+    fridaToolsLib = pkgs.python312.pkgs.toPythonModule (pkgs.frida-tools.override {python3Packages = pkgs.python312Packages;});
+    litecliLib = pkgs.python312.pkgs.toPythonModule (pkgs.litecli.override {python3Packages = pkgs.python312Packages;});
     deps = with pkgs; [
-      frida-tools
       click
-      litecli
       semver
+      fridaToolsLib
+      litecliLib
+      python312Packages.packaging
+      python312Packages.wheel
+      python312Packages.setuptools
       python312Packages.tabulate
       python312Packages.requests
       python312Packages.flask
       python312Packages.pygments
       python312Packages.delegator-py
       python312Packages.setuptools
+      python312Packages.frida-python
+      python312Packages.prompt-toolkit
     ];
   in
   {
 
     packages.${system}.default = python.pkgs.buildPythonPackage rec {
       pname = "objection";
-      version = "1.11.0";
+      version = "1.12.3";
 
       # Use PyPI source directly
       src = pkgs.fetchPypi {
         inherit pname version;
-        sha256 = "sha256-HhZ+FXlyC2ijvMMM9F5iv5i6OUIwfMTN9OQgHzkguHo=";
+        sha256 = "sha256-Qwkn7LPfW/k3G4yLcuX9I1/3bZQf7tdrWFaRZycjNLQ=";
       };
 
       pyproject = true;
-      build-system = [ python.pkgs.setuptools ];
+      build-system = [ python.pkgs.setuptools python.pkgs.wheel ];
       propagatedBuildInputs = deps;
       nativeBuildInputs = deps;
       doCheck = false; # disable tests to keep it simple
