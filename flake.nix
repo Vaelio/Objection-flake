@@ -5,64 +5,120 @@
     nixpkgs.url = "github:nixos/nixpkgs?ref=25.11";
   };
 
-  outputs = { self, nixpkgs }: 
-  
-  let 
-    system = "x86_64-linux";
-    pkgs = import nixpkgs { inherit system; };
-    python = pkgs.python312;
-    semver = python.pkgs.buildPythonPackage rec {
-      pname = "semver";
-      version = "2.13.0"; # use your needed version
+  outputs =
+    { self, nixpkgs }:
 
-      src = pkgs.fetchPypi {
-        inherit pname version;
-        sha256 = "sha256-+g/ici7hw/V+rEeIIMOlri9iSvgmTL35AAyYD/f3Xj8=";
+    let
+      system = "x86_64-linux";
+      pkgs = import nixpkgs { inherit system; };
+      python = pkgs.python312;
+      pypiMeta =
+        {
+          x86_64-linux = {
+            hash = "sha256-/iyCMbaeItPcnothXUXcwfOeRjrNu0MUy1dGm2bAwtk=";
+            platform = "manylinux1_x86_64";
+          };
+        }
+        .${system} or (throw "Unsupported system: ${system}");
+      fridaPythonPkg = python.pkgs.buildPythonPackage {
+        pname = "frida-python";
+        format = "wheel";
+        version = "16.7.19";
+        inherit system;
+
+        src = pkgs.fetchPypi {
+          inherit (pypiMeta) hash platform;
+          pname = "frida";
+          format = "wheel";
+          version = "16.7.19";
+          abi = "abi3";
+          python = "cp37";
+          dist = "cp37";
+        };
+
+        pythonImportsCheck = [
+          "frida"
+          "frida._frida"
+        ];
+
+        meta = {
+          description = "Dynamic instrumentation toolkit for developers, reverse-engineers, and security researchers (Python bindings)";
+          homepage = "https://www.frida.re";
+          license = with pkgs.lib.licenses; [
+            lgpl2Plus
+            wxWindowsException31
+          ];
+          maintainers = with pkgs.lib.maintainers; [ s1341 ];
+          platforms = [
+            "x86_64-linux"
+            "aarch64-linux"
+            "x86_64-darwin"
+            "aarch64-darwin"
+          ];
+        };
+      };
+      semver = python.pkgs.buildPythonPackage rec {
+        pname = "semver";
+        version = "2.13.0"; # use your needed version
+
+        src = pkgs.fetchPypi {
+          inherit pname version;
+          sha256 = "sha256-+g/ici7hw/V+rEeIIMOlri9iSvgmTL35AAyYD/f3Xj8=";
+        };
+
+        pyproject = true;
+        build-system = [ python.pkgs.setuptools ];
+        doCheck = false;
+      };
+      #fridaToolsLib = pkgs.python312.pkgs.toPythonModule (
+      #  pkgs.frida-tools.override { python3Packages = pkgs.python312Packages; }
+      #);
+      litecliLib = pkgs.python312.pkgs.toPythonModule (
+        pkgs.litecli.override { python3Packages = pkgs.python312Packages; }
+      );
+      fridaToolsLib = python.pkgs.callPackage ./frida-tools/frida-tools.nix {
+        frida-python = fridaPythonPkg;
+      };
+      deps = with pkgs; [
+        click
+        semver
+        fridaToolsLib
+        litecliLib
+        python312Packages.packaging
+        python312Packages.wheel
+        python312Packages.setuptools
+        python312Packages.tabulate
+        python312Packages.requests
+        python312Packages.flask
+        python312Packages.pygments
+        python312Packages.delegator-py
+        python312Packages.setuptools
+        #python312Packages.frida-python
+        fridaPythonPkg
+        python312Packages.prompt-toolkit
+      ];
+    in
+    {
+
+      packages.${system}.default = python.pkgs.buildPythonPackage rec {
+        pname = "objection";
+        version = "1.12.3";
+
+        # Use PyPI source directly
+        src = pkgs.fetchPypi {
+          inherit pname version;
+          sha256 = "sha256-Qwkn7LPfW/k3G4yLcuX9I1/3bZQf7tdrWFaRZycjNLQ=";
+        };
+
+        pyproject = true;
+        build-system = [
+          python.pkgs.setuptools
+          python.pkgs.wheel
+        ];
+        propagatedBuildInputs = deps;
+        nativeBuildInputs = deps;
+        doCheck = false; # disable tests to keep it simple
       };
 
-      pyproject = true;
-      build-system = [ python.pkgs.setuptools ];
-      doCheck = false;
     };
-    fridaToolsLib = pkgs.python312.pkgs.toPythonModule (pkgs.frida-tools.override {python3Packages = pkgs.python312Packages;});
-    litecliLib = pkgs.python312.pkgs.toPythonModule (pkgs.litecli.override {python3Packages = pkgs.python312Packages;});
-    deps = with pkgs; [
-      click
-      semver
-      fridaToolsLib
-      litecliLib
-      python312Packages.packaging
-      python312Packages.wheel
-      python312Packages.setuptools
-      python312Packages.tabulate
-      python312Packages.requests
-      python312Packages.flask
-      python312Packages.pygments
-      python312Packages.delegator-py
-      python312Packages.setuptools
-      python312Packages.frida-python
-      python312Packages.prompt-toolkit
-    ];
-  in
-  {
-
-    packages.${system}.default = python.pkgs.buildPythonPackage rec {
-      pname = "objection";
-      version = "1.12.3";
-
-      # Use PyPI source directly
-      src = pkgs.fetchPypi {
-        inherit pname version;
-        sha256 = "sha256-Qwkn7LPfW/k3G4yLcuX9I1/3bZQf7tdrWFaRZycjNLQ=";
-      };
-
-      pyproject = true;
-      build-system = [ python.pkgs.setuptools python.pkgs.wheel ];
-      propagatedBuildInputs = deps;
-      nativeBuildInputs = deps;
-      doCheck = false; # disable tests to keep it simple
-    };
-
-  };
 }
-
